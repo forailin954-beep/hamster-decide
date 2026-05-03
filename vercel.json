@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/hamster-decide.html" },
+    { "source": "/(.*)", "destination": "/hamster-decide.html" }
+  ]
+}
