@@ -1,0 +1,9 @@
+services:
+  - name: hamster-decide
+    type: static
+    staticPublishPath: .
+    buildCommand: echo "no build needed"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /hamster-decide.html

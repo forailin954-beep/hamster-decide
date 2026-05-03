@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#fdfaf6">
+  <title>🐹 倉鼠決策機</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐹</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── DESIGN TOKENS ──────────────────── */
+    :root {
+      --bg:      #fdfaf6;
+      --surf:    #ffffff;
+      --card:    #f8f3eb;
+      --brd:     #e5d5bc;
+      --text:    #2d1a0a;
+      --muted:   #9a7050;
+      --orange:  #e07b42;
+      --gold:    #c8a055;
+      --eat:     #c95c3e;
+      --drink:   #4a9e82;
+      --play:    #b84b82;
+      --eat-a:   rgba(201,92,62,.10);
+      --drink-a: rgba(74,158,130,.10);
+      --play-a:  rgba(184,75,130,.10);
+      --shadow-sm: 0 2px 8px rgba(45,26,10,.07), 0 1px 2px rgba(45,26,10,.04);
+      --shadow:    0 4px 20px rgba(45,26,10,.08), 0 1px 4px rgba(45,26,10,.04);
+      --shadow-lg: 0 8px 40px rgba(45,26,10,.10), 0 2px 8px rgba(45,26,10,.06);
+      --r: 18px;
+      --r-sm: 12px;
+    }
+
+    *, *::before, *::after {
+      margin: 0; padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 80% 45% at 50% -5%,  rgba(224,123,66,.08) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 40% at 12% 90%, rgba(201,92,62,.05) 0%, transparent 55%),
+        radial-gradient(ellipse 45% 35% at 90% 80%, rgba(74,158,130,.04) 0%, transparent 55%);
+      color: var(--text);
+      font-family: 'Noto Sans TC', system-ui, sans-serif;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      position: relative;
+    }
+    /* subtle paper grain */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: .018;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .app { position: relative; z-index: 1; }
+
+    .app {
+      max-width: 430px;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 5rem;
+    }
+
+    /* ── HEADER ─────────────────────────── */
+    header { text-align: center; padding: .75rem 0 1.75rem; }
+
+    .title {
+      font-family: 'Syne', 'Noto Sans TC', system-ui, sans-serif;
+      font-size: clamp(1.65rem, 7vw, 2rem);
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -.04em;
+      line-height: 1;
+      display: inline-block;
+      cursor: default;
+    }
+    .title:active { animation: wiggle .5s ease; }
+    @keyframes wiggle {
+      0%,100% { transform: rotate(0); }
+      20% { transform: rotate(-4deg) scale(.98); }
+      50% { transform: rotate(3.5deg) scale(1.02); }
+      80% { transform: rotate(-2deg); }
+    }
+
+    .subtitle {
+      margin-top: .5rem;
+      font-size: .64rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: .7;
+    }
+
+    /* ── HTTPS WARNING ──────────────────── */
+    .https-warn {
+      background: rgba(251,191,36,.06);
+      border: 1px solid rgba(251,191,36,.30);
+      border-radius: var(--r);
+      padding: .8rem 1rem;
+      font-size: .78rem;
+      color: #b45309;
+      line-height: 1.65;
+      margin-bottom: .9rem;
+    }
+    .https-warn strong { display: block; margin-bottom: .25rem; font-size: .82rem; }
+    .https-warn code {
+      background: rgba(180,83,9,.10);
+      border-radius: 4px;
+      padding: .1rem .38rem;
+      font-family: monospace;
+      font-size: .76rem;
+    }
+
+    /* ── LOCATION BAR ───────────────────── */
+    .loc-bar {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      background: var(--surf);
+      border: 1.5px solid var(--brd);
+      border-radius: 100px;
+      padding: .42rem .42rem .42rem .8rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-sm);
+      transition: border-color .3s, box-shadow .3s;
+    }
+    .loc-bar.located {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34,197,94,.08), var(--shadow-sm);
+    }
+
+    .loc-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--brd);
+      flex-shrink: 0;
+      transition: background .3s;
+    }
+    .loc-bar.located .loc-dot { background: #22c55e; animation: pulse-dot 2s ease infinite; }
+    @keyframes pulse-dot {
+      0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.4); }
+      50% { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+    }
+
+    .loc-text {
+      font-size: .75rem;
+      color: var(--muted);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: color .3s;
+    }
+    .loc-bar.located .loc-text { color: #16a34a; }
+
+    /* county chip */
+    .county-chip {
+      display: none;
+      font-size: .68rem;
+      font-weight: 700;
+      background: rgba(34,197,94,.12);
+      color: #16a34a;
+      padding: .18rem .55rem;
+      border-radius: 100px;
+      white-space: nowrap;
+      border: 1px solid rgba(34,197,94,.25);
+      flex-shrink: 0;
+      animation: chip-in .35s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes chip-in {
+      from { transform: scale(.6); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+
+    .loc-btn {
+      background: var(--card);
+      border: 1px solid var(--brd);
+      border-radius: 100px;
+      color: var(--text);
+      font: 700 .73rem/1 'Noto Sans TC',sans-serif;
+      padding: .42rem .85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all .2s;
+      box-shadow: var(--shadow-sm);
+    }
+    .loc-btn:active { transform: scale(.95); }
+    .loc-bar.located .loc-btn {
+      background: rgba(34,197,94,.10);
+      border-color: rgba(34,197,94,.35);
+      color: #16a34a;
+    }
+
+    /* ── HAMSTER STAGE ──────────────────── */
+    .stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .65rem;
+      margin-bottom: 1.75rem;
+    }
+
+    /* ── HAMSTER ANIMATIONS ─────────────── */
+    @keyframes ham-sway {
+      0%,100% { transform: rotate(0deg)     translateY(0px); }
+      18%     { transform: rotate(-2.5deg)  translateY(-3px); }
+      40%     { transform: rotate(2deg)     translateY(-5px); }
+      62%     { transform: rotate(-1.5deg)  translateY(-2px); }
+      82%     { transform: rotate(2.5deg)   translateY(-4px); }
+    }
+    @keyframes ham-spin-shake {
+      0%   { transform: rotate(-7deg) translateX(-5px) translateY(-2px) skewX(-2deg); }
+      14%  { transform: rotate(9deg)  translateX(7px)  translateY(-8px) skewX(3deg); }
+      28%  { transform: rotate(-9deg) translateX(-8px) translateY(-3px) skewX(-3deg); }
+      42%  { transform: rotate(8deg)  translateX(6px)  translateY(-9px); }
+      57%  { transform: rotate(-7deg) translateX(-6px) translateY(-5px) skewX(2deg); }
+      71%  { transform: rotate(8deg)  translateX(7px)  translateY(-4px) skewX(-2deg); }
+      85%  { transform: rotate(-6deg) translateX(-4px) translateY(-7px); }
+      100% { transform: rotate(-7deg) translateX(-5px) translateY(-2px) skewX(-2deg); }
+    }
+    @keyframes ham-excited {
+      0%,100% { transform: rotate(0deg)    scale(1)    translateY(0); }
+      10%     { transform: rotate(-5deg)   scale(1.06) translateY(-6px); }
+      25%     { transform: rotate(5.5deg)  scale(1.08) translateY(-9px); }
+      40%     { transform: rotate(-4deg)   scale(1.05) translateY(-6px); }
+      55%     { transform: rotate(4.5deg)  scale(1.07) translateY(-8px); }
+      70%     { transform: rotate(-2.5deg) scale(1.03) translateY(-4px); }
+      85%     { transform: rotate(2deg)    scale(1.02) translateY(-3px); }
+    }
+
+    .frame {
+      width: 188px;
+      height: 188px;
+      position: relative;
+      transform-origin: center 65%;
+      animation: ham-sway 7s ease-in-out infinite;
+      will-change: transform;
+    }
+    .frame.spinning { animation: ham-spin-shake 0.22s ease-in-out infinite; }
+    .frame.excited  { animation: ham-excited 1.1s ease-in-out 3 both; }
+
+    /* squash-stretch pop on each GIF tick */
+    @keyframes cy-pop {
+      0%   { transform: scale(1,1)      rotate(0deg);   filter: brightness(1); }
+      18%  { transform: scale(1.4,.65)  rotate(-10deg); filter: brightness(3) saturate(3) hue-rotate(40deg); }
+      40%  { transform: scale(.78,1.3)  rotate(6deg);   filter: brightness(.6) saturate(.5); }
+      65%  { transform: scale(1.1,.93)  rotate(-3deg);  filter: brightness(1.5); }
+      82%  { transform: scale(.97,1.03) rotate(1deg);   filter: brightness(1.1); }
+      100% { transform: scale(1,1)      rotate(0deg);   filter: brightness(1); }
+    }
+    .ham-cycle.cy-pop {
+      animation: cy-pop .2s cubic-bezier(.36,.07,.19,.97) both !important;
+      transition: none !important;
+    }
+
+    /* wrap flash — softer on white bg */
+    @keyframes wrap-flash {
+      0%   { background: var(--surf); }
+      28%  { background: rgba(255,200,60,.22); }
+      65%  { background: rgba(255,110,70,.10); }
+      100% { background: var(--surf); }
+    }
+    .ham-wrap.ticking { animation: wrap-flash .2s ease-out; }
+
+    /* spinning ring */
+    .ring {
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg,
+        var(--orange), var(--gold), var(--eat), var(--play), var(--drink), var(--orange));
+      animation: ring-spin 3.5s linear infinite;
+      will-change: transform;
+    }
+    .ring::after {
+      content: '';
+      position: absolute; inset: 5px;
+      border-radius: 50%;
+      background: var(--bg);
+    }
+    @keyframes ring-spin { to { transform: rotate(360deg); } }
+
+    .ring.fast  { animation-duration: .35s !important; }
+    .ring.glow-eat   { background: conic-gradient(from 0deg, var(--eat),   #ff9070, var(--eat));   animation-duration: 1.2s !important; }
+    .ring.glow-drink { background: conic-gradient(from 0deg, var(--drink), #80ffe8, var(--drink)); animation-duration: 1.2s !important; }
+    .ring.glow-play  { background: conic-gradient(from 0deg, var(--play),  #ff90cc, var(--play));  animation-duration: 1.2s !important; }
+
+    /* hamster circle */
+    .ham-wrap {
+      position: absolute; inset: 6px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--surf);
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      contain: style layout;
+    }
+    /* transparent overlay — blocks all mouse events on iframes */
+    .ham-wrap::after {
+      content: '';
+      position: absolute; inset: 0;
+      z-index: 9999;
+      border-radius: 50%;
+      pointer-events: auto;
+      cursor: default;
+    }
+    .ham-state iframe,
+    .ham-state .tenor-gif-embed iframe {
+      pointer-events: none !important;
+    }
+
+    /* emoji fallback */
+    .ham-fb {
+      font-size: 4.5rem;
+      position: absolute;
+      z-index: 0;
+      animation: breathe 2.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes breathe {
+      0%,100% { transform: scale(1) rotate(0); }
+      50%      { transform: scale(1.1) rotate(3deg); }
+    }
+
+    /* ── GIF STATES ─────────────────────── */
+    .ham-state {
+      position: absolute; inset: 0;
+      z-index: 1;
+      opacity: .001;
+      transform: scale(.82);
+      transition: opacity .45s cubic-bezier(.34,1.56,.64,1),
+                  transform .45s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+    }
+    .ham-state.active {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+
+    /* slot-machine visual effect (CSS only, no iframe switch) */
+    @keyframes gif-cycle-fx {
+      0%   { filter: brightness(1.35) saturate(1.8) hue-rotate(0deg);    transform: scale(1.04) skewX(.5deg); }
+      20%  { filter: brightness(.9)   saturate(1.2) hue-rotate(25deg);   transform: scale(.97)  skewX(-1deg); }
+      40%  { filter: brightness(1.45) saturate(2.2) hue-rotate(-18deg);  transform: scale(1.06) skewX(1deg); }
+      60%  { filter: brightness(.92)  saturate(1.4) hue-rotate(12deg);   transform: scale(.98)  skewX(0deg); }
+      80%  { filter: brightness(1.25) saturate(1.8) hue-rotate(-8deg);   transform: scale(1.03) skewX(-.5deg); }
+      100% { filter: brightness(1.35) saturate(1.8) hue-rotate(0deg);    transform: scale(1.04) skewX(.5deg); }
+    }
+    .ham-wrap.cycling .ham-state.active {
+      animation: gif-cycle-fx .35s linear infinite !important;
+      transition: none !important;
+    }
+
+    /* burst-in reveal */
+    @keyframes gif-burst {
+      0%   { transform: scale(.4) rotate(-8deg); opacity: 0; }
+      55%  { transform: scale(1.18) rotate(3deg); opacity: 1; }
+      75%  { transform: scale(.94) rotate(-1deg); }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .ham-state.burst-in {
+      animation: gif-burst .75s cubic-bezier(.34,1.56,.64,1) both !important;
+    }
+
+    .ham-state .tenor-gif-embed {
+      position: absolute !important;
+      top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
+      margin: 0 !important;
+    }
+    .ham-state .tenor-gif-embed a,
+    .ham-state .tenor-gif-embed > div > a {
+      display: block !important; position: absolute !important;
+      top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
+      padding-top: 0 !important;
+      background-size: cover !important;
+      background-position: center center !important;
+      background-repeat: no-repeat !important;
+    }
+    .ham-state .tenor-gif-embed img {
+      position: absolute !important; inset: 0 !important;
+      width: 100% !important; height: 100% !important;
+      object-fit: cover !important;
+    }
+    .ham-state .tenor-gif-embed iframe {
+      position: absolute !important; inset: 0 !important;
+      width: 100% !important; height: 100% !important;
+      border: none !important;
+    }
+
+    /* status text */
+    .status {
+      font-size: .7rem;
+      letter-spacing: .1em;
+      color: var(--muted);
+      min-height: 1em;
+      transition: color .3s;
+    }
+    .status.lit { color: var(--orange); }
+
+    /* ── CATEGORY BUTTONS ───────────────── */
+    .cats {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: .55rem;
+      margin-bottom: 1.25rem;
+    }
+    .cat {
+      background: var(--surf);
+      border: 1.5px solid var(--brd);
+      border-radius: 16px;
+      padding: .9rem .4rem .75rem;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--muted);
+      display: flex; flex-direction: column;
+      align-items: center; gap: .2rem;
+      transition: all .25s cubic-bezier(.34,1.56,.64,1);
+      user-select: none;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    .cat::before {
+      content: '';
+      position: absolute; inset: 0;
+      opacity: 0;
+      transition: opacity .25s;
+      border-radius: inherit;
+    }
+    @media (hover: hover) {
+      .cat:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    }
+    .cat:active { transform: scale(.93); box-shadow: var(--shadow-sm); }
+    .c-em { font-size: 1.5rem; line-height: 1; }
+    .c-en { font-size: .52rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; opacity:.55; }
+    .c-zh { font-size: .8rem; font-weight:700; }
+
+    .cat.on[data-cat=eat]   {
+      border-color: var(--eat);
+      background: linear-gradient(145deg, rgba(201,92,62,.08), rgba(201,92,62,.04));
+      color: var(--eat);
+      box-shadow: 0 4px 16px rgba(201,92,62,.18), 0 0 0 1px rgba(201,92,62,.12);
+      transform: translateY(-3px);
+    }
+    .cat.on[data-cat=drink] {
+      border-color: var(--drink);
+      background: linear-gradient(145deg, rgba(74,158,130,.08), rgba(74,158,130,.04));
+      color: var(--drink);
+      box-shadow: 0 4px 16px rgba(74,158,130,.18), 0 0 0 1px rgba(74,158,130,.12);
+      transform: translateY(-3px);
+    }
+    .cat.on[data-cat=play]  {
+      border-color: var(--play);
+      background: linear-gradient(145deg, rgba(184,75,130,.08), rgba(184,75,130,.04));
+      color: var(--play);
+      box-shadow: 0 4px 16px rgba(184,75,130,.18), 0 0 0 1px rgba(184,75,130,.12);
+      transform: translateY(-3px);
+    }
+
+    /* ── RESULT BOX ─────────────────────── */
+    .rbox {
+      background: var(--surf);
+      border: 1.5px solid var(--brd);
+      border-radius: var(--r);
+      min-height: 108px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+      padding: 1.5rem;
+      position: relative; overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: border-color .5s ease, box-shadow .5s ease;
+    }
+    .rbox::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent 0%, var(--orange) 50%, transparent 100%);
+      opacity: .35;
+      pointer-events: none;
+    }
+
+    .rbox.g-eat   {
+      border-color: rgba(201,92,62,.45);
+      box-shadow: 0 6px 32px rgba(201,92,62,.10), 0 0 0 1px rgba(201,92,62,.08), var(--shadow);
+    }
+    .rbox.g-eat::before   { background: linear-gradient(90deg, transparent, var(--eat), transparent); opacity: .6; }
+    .rbox.g-drink {
+      border-color: rgba(74,158,130,.45);
+      box-shadow: 0 6px 32px rgba(74,158,130,.10), 0 0 0 1px rgba(74,158,130,.08), var(--shadow);
+    }
+    .rbox.g-drink::before { background: linear-gradient(90deg, transparent, var(--drink), transparent); opacity: .6; }
+    .rbox.g-play  {
+      border-color: rgba(184,75,130,.45);
+      box-shadow: 0 6px 32px rgba(184,75,130,.10), 0 0 0 1px rgba(184,75,130,.08), var(--shadow);
+    }
+    .rbox.g-play::before  { background: linear-gradient(90deg, transparent, var(--play), transparent); opacity: .6; }
+
+    .hint { text-align:center; color:var(--muted); font-size:.85rem; line-height:1.8; }
+    .hint em { display:block; font-style:normal; font-size:.75em; opacity:.5; margin-top:.25rem; }
+
+    .pick {
+      display: none;
+      font-family: 'Syne', 'Noto Sans TC', system-ui, sans-serif;
+      font-size: clamp(1.4rem, 6.5vw, 1.9rem);
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: -.03em;
+      line-height: 1.2;
+    }
+    .pick.rolling { animation: roll .14s ease-out; filter:blur(.5px); opacity:.85; }
+    .pick.pop     { animation: pop-in .6s cubic-bezier(.34,1.56,.64,1) both; filter:none; opacity:1; }
+    .pick.eat   { color: var(--eat); }
+    .pick.drink { color: var(--drink); }
+    .pick.play  { color: var(--play); }
+
+    @keyframes roll {
+      0%   { transform: translateY(-28px) rotate(-4deg) scale(1.1); opacity: 0; filter: blur(3px); }
+      40%  { transform: translateY(6px)   rotate(1.5deg) scale(1.04); opacity: 1; filter: blur(0); }
+      70%  { transform: translateY(-4px)  rotate(-.5deg); }
+      100% { transform: translateY(0)     rotate(0); }
+    }
+    @keyframes pop-in {
+      0%   { transform:scale(.4) rotate(-8deg); opacity:0; }
+      60%  { transform:scale(1.15) rotate(2deg); }
+      100% { transform:scale(1) rotate(0); opacity:1; }
+    }
+
+    /* local badge on result */
+    .local-badge {
+      display: inline-flex; align-items: center; gap: .28rem;
+      font-size: .64rem; font-weight: 700;
+      color: #16a34a;
+      background: rgba(34,197,94,.10);
+      border: 1px solid rgba(34,197,94,.2);
+      border-radius: 100px;
+      padding: .18rem .55rem;
+      margin-top: .4rem;
+      animation: chip-in .4s cubic-bezier(.34,1.56,.64,1) both;
+    }
+
+    /* ── SPIN BUTTON ────────────────────── */
+    .spin-btn {
+      width: 100%;
+      padding: 1.15rem;
+      background: var(--orange);
+      border: none; border-radius: 50px;
+      color: #1a0c00;
+      font: 700 1.05rem/1 'Noto Sans TC', sans-serif;
+      cursor: pointer;
+      letter-spacing: .04em;
+      position: relative; overflow: hidden;
+      box-shadow: 0 4px 20px rgba(224,123,66,.32), 0 1px 0 rgba(255,255,255,.15) inset;
+      transition: transform .18s ease, box-shadow .18s ease, background .2s ease;
+      user-select: none;
+    }
+    /* top highlight */
+    .spin-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,.14) 0%, transparent 55%);
+      pointer-events: none;
+      border-radius: inherit;
+    }
+    /* shimmer sweep */
+    .spin-btn::after {
+      content: '';
+      position: absolute; top: 0; left: -80%; width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+      animation: btn-shimmer 2.8s ease-in-out infinite;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+    @keyframes btn-shimmer {
+      0%,40% { left: -80%; opacity: 0; }
+      42%    { opacity: 1; }
+      70%    { left: 120%; opacity: 0; }
+      100%   { left: 120%; opacity: 0; }
+    }
+    @media (hover: hover) {
+      .spin-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 28px rgba(224,123,66,.40), 0 1px 0 rgba(255,255,255,.15) inset;
+      }
+    }
+    .spin-btn:active { transform: scale(.97) translateY(1px); box-shadow: 0 2px 10px rgba(224,123,66,.22); }
+    .spin-btn.busy {
+      background: var(--card);
+      color: var(--muted);
+      border: 1.5px solid var(--brd);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    .spin-btn.busy::after { display: none; }
+
+    /* ripple */
+    .rip {
+      position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,.25);
+      transform: scale(0);
+      animation: rip-out .7s ease-out forwards;
+      pointer-events: none;
+    }
+    @keyframes rip-out { to { transform:scale(4.5); opacity:0; } }
+
+    /* ── NEARBY BUTTON ──────────────────── */
+    .nearby-btn {
+      display: none;
+      width: 100%;
+      margin-top: .75rem;
+      padding: .85rem 1rem;
+      border: 1.5px solid rgba(224,123,66,.30);
+      background: linear-gradient(135deg, rgba(224,123,66,.05), rgba(224,123,66,.02));
+      border-radius: 14px;
+      color: var(--orange);
+      font: 700 .9rem/1.3 'Noto Sans TC', sans-serif;
+      cursor: pointer;
+      text-align: center;
+      transition: all .25s ease;
+      user-select: none;
+      box-shadow: var(--shadow-sm);
+      animation: slide-up .45s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @media (hover: hover) { .nearby-btn:hover { background: rgba(224,123,66,.08); transform: translateY(-1px); } }
+    .nearby-btn:active { transform: scale(.97); background: rgba(224,123,66,.10); }
+    .nearby-btn.show { display: block; }
+    .nearby-btn small { display: block; font-size: .7rem; font-weight: 400; color: var(--muted); margin-top: .2rem; }
+    @keyframes slide-up { from { transform:translateY(12px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+
+    /* ── NEARBY RESULTS LIST ────────────── */
+    .nearby-list { display: none; margin-top: .75rem; }
+    .nearby-list.show { display: block; animation: slide-up .4s ease both; }
+
+    .nl-header {
+      font-size: .6rem;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: .65rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .nl-header::after { content: ''; flex: 1; height: 1px; background: var(--brd); }
+
+    .nearby-card {
+      background: var(--surf);
+      border: 1.5px solid var(--brd);
+      border-radius: var(--r);
+      padding: .8rem 1rem;
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: .4rem;
+      cursor: pointer;
+      transition: all .22s ease;
+      text-decoration: none;
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+    @media (hover: hover) {
+      .nearby-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+        border-color: rgba(224,123,66,.25);
+        background: var(--card);
+      }
+    }
+    .nearby-card:active { transform: scale(.98); background: var(--card); }
+    .nearby-card:last-of-type { margin-bottom: 0; }
+
+    .nl-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+      width: 2.2rem; height: 2.2rem;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--card);
+      border-radius: 10px;
+      border: 1px solid var(--brd);
+    }
+    .nl-info { flex: 1; min-width: 0; }
+    .nl-name {
+      font-size: .875rem; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: .18rem;
+    }
+    .nl-meta { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .nl-dist {
+      font-size: .65rem; color: var(--orange); font-weight: 700;
+      background: rgba(224,123,66,.10);
+      padding: .1rem .4rem; border-radius: 100px; white-space: nowrap;
+    }
+    .nl-type { font-size: .65rem; color: var(--muted); }
+    .nl-arrow { color: var(--brd); font-size: .85rem; flex-shrink: 0; }
+
+    .nl-loading {
+      text-align: center; color: var(--muted); font-size: .82rem;
+      padding: 1.1rem .5rem;
+      display: flex; align-items: center; justify-content: center; gap: .6rem;
+    }
+    .nl-spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--brd);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: sp .75s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
+
+    .nl-empty {
+      text-align: center; color: var(--muted); font-size: .82rem;
+      padding: .65rem .5rem; line-height: 1.7;
+    }
+    .nl-maps-btn {
+      display: block; text-align: center;
+      margin-top: .65rem; padding: .72rem;
+      background: rgba(224,123,66,.06);
+      border: 1.5px solid rgba(224,123,66,.22);
+      border-radius: 12px;
+      color: var(--orange); font-size: .82rem; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      transition: all .2s;
+      box-shadow: var(--shadow-sm);
+    }
+    @media (hover: hover) { .nl-maps-btn:hover { background: rgba(224,123,66,.10); } }
+    .nl-maps-btn:active { background: rgba(224,123,66,.14); transform: scale(.98); }
+
+    /* ── HISTORY ────────────────────────── */
+    .hist { margin-top: 1.75rem; display: none; }
+    .hist-label { font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-bottom:.65rem; }
+    .hist-tags  { display:flex; flex-wrap:wrap; gap:.4rem; }
+    .h-tag {
+      font-size: .78rem; padding: .28rem .72rem;
+      border-radius: 100px;
+      border: 1.5px solid var(--brd);
+      background: var(--surf);
+      color: var(--muted);
+      animation: tag-in .3s ease both;
+      box-shadow: var(--shadow-sm);
+    }
+    .h-tag.eat   { border-color:rgba(201,92,62,.40);  color:var(--eat);   background: var(--eat-a); }
+    .h-tag.drink { border-color:rgba(74,158,130,.40); color:var(--drink); background: var(--drink-a); }
+    .h-tag.play  { border-color:rgba(184,75,130,.40); color:var(--play);  background: var(--play-a); }
+    @keyframes tag-in { from { opacity:0; transform:scale(.65); } to { opacity:1; transform:scale(1); } }
+
+    /* ── CONFETTI CANVAS ────────────────── */
+    #cv { position:fixed; inset:0; pointer-events:none; z-index:9999; }
+
+    /* ── FLOATING PARTICLES ─────────────── */
+    .fp {
+      position: fixed; pointer-events: none; z-index:9998;
+      font-size: 1.5rem;
+      animation: fly-up 2s ease-out forwards;
+    }
+    @keyframes fly-up {
+      0%   { opacity:1; transform:translateY(0) scale(1) rotate(0); }
+      100% { opacity:0; transform:translateY(-200px) scale(.3) rotate(720deg); }
+    }
+  </style>
+</head>
+
+<body>
+<canvas id="cv"></canvas>
+
+<script async src="https://tenor.com/embed.js"></script>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <h1 class="title" id="title-el">🐹 倉鼠決策機</h1>
+    <p class="subtitle">HAMSTER DECIDES · 今天要幹嘛？</p>
+  </header>
+
+  <!-- iOS / file:// HTTPS WARNING -->
+  <div id="https-warn" class="https-warn" style="display:none">
+    <strong>⚠️ iOS Safari 定位限制</strong>
+    本機 <code>file://</code> 不支援定位，需要 HTTPS。解法：<br>
+    ① 部署到 <code>Render / Vercel</code>（免費，5 分鐘）<br>
+    ② 或本機執行 <code>npx serve .</code> 後用瀏覽器開啟
+  </div>
+
+  <!-- LOCATION BAR -->
+  <div class="loc-bar" id="loc-bar">
+    <div class="loc-dot" id="loc-dot"></div>
+    <span class="loc-text" id="loc-text">啟用定位，推薦當地選項 + 找附近店家</span>
+    <span class="county-chip" id="county-chip"></span>
+    <button class="loc-btn" id="loc-btn">📍 啟用</button>
+  </div>
+
+  <!-- HAMSTER STAGE -->
+  <section class="stage">
+    <div class="frame">
+      <div class="ring" id="ring"></div>
+
+      <div class="ham-wrap">
+        <span class="ham-fb" id="ham-fb">🐹</span>
+
+        <div class="ham-state active" id="s-idle">
+          <div class="tenor-gif-embed"
+               data-postid="9362610808603976595"
+               data-share-method="host"
+               data-aspect-ratio="1"
+               data-width="176px"></div>
+        </div>
+
+        <!-- 循環槽：spin 期間 CSS-only 輪替，不重新發請求 -->
+        <div class="ham-state ham-cycle" id="cy-0" data-postid="11717241442082625890" data-ratio="1"></div>
+        <div class="ham-state ham-cycle" id="cy-1" data-postid="7664926947584230577" data-ratio="1"></div>
+        <div class="ham-state ham-cycle" id="cy-2" data-postid="5161457700748615273" data-ratio="1"></div>
+        <div class="ham-state ham-cycle" id="cy-3" data-postid="8409566934641275028" data-ratio="1"></div>
+        <div class="ham-state ham-cycle" id="cy-4" data-postid="13443794283095204299" data-ratio="1"></div>
+
+        <!-- 結果槽：每次 spin 注入新 iframe，GIF 不重複 -->
+        <div class="ham-state" id="s-result" style="background:var(--surf);"></div>
+      </div>
+    </div>
+
+    <span class="status" id="status">waiting for your input...</span>
+  </section>
+
+  <!-- CATEGORY SELECTOR -->
+  <div class="cats">
+    <button class="cat on" data-cat="eat">
+      <span class="c-em">🍔</span>
+      <span class="c-en">EAT</span>
+      <span class="c-zh">吃什麼</span>
+    </button>
+    <button class="cat" data-cat="drink">
+      <span class="c-em">🧋</span>
+      <span class="c-en">DRINK</span>
+      <span class="c-zh">喝什麼</span>
+    </button>
+    <button class="cat" data-cat="play">
+      <span class="c-em">🎮</span>
+      <span class="c-en">PLAY</span>
+      <span class="c-zh">玩什麼</span>
+    </button>
+  </div>
+
+  <!-- RESULT BOX -->
+  <div class="rbox" id="rbox">
+    <p class="hint" id="hint">選個分類<em>讓倉鼠替你做主 lol</em></p>
+    <div class="pick" id="pick"></div>
+  </div>
+
+  <!-- SPIN BUTTON -->
+  <button class="spin-btn" id="spin-btn">🎰 Let Hamster Decide!</button>
+
+  <!-- NEARBY BUTTON -->
+  <button class="nearby-btn" id="nearby-btn"></button>
+
+  <!-- NEARBY RESULTS -->
+  <div id="nearby-list" class="nearby-list"></div>
+
+  <!-- HISTORY -->
+  <div class="hist" id="hist">
+    <div class="hist-label">RECENT PICKS / 最近抽到</div>
+    <div class="hist-tags" id="hist-tags"></div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   DATA — base items
+═══════════════════════════════════════ */
+const ITEMS = {
+  eat: [
+    '🍔 麥當勞','🧋 珍珠奶茶','🍜 牛肉麵','🍱 排骨便當',
+    '🍣 壽司','🍕 Pizza','🥩 燒肉','🍗 雞排',
+    '🌮 Taco Bell','🎂 蛋糕','🍦 霜淇淋','🍛 咖哩飯',
+    '🥚 蛋餅','🍖 鹹酥雞',
+  ],
+  drink: [
+    '🧋 波霸奶茶','☕ 咖啡廳','🥤 可樂','🍵 抹茶拿鐵',
+    '🍊 柳橙汁','🍺 Beer','🍹 調酒BAR','🫖 手搖紅茶',
+    '🥛 鮮奶','🧃 果汁','💧 礦泉水（哭哭）','🍋 檸檬愛玉',
+  ],
+  play: [
+    '🎮 打電動','📺 Netflix','🎤 KTV','🎳 保齡球',
+    '🛒 逛街購物','🎲 桌遊咖啡','🚴 騎腳踏車','⛰️ 爬山健行',
+    '🎬 看電影','🏀 打球','🎯 射飛鏢','🎨 畫畫',
+    '💤 睡覺啦','📱 滑手機（又回來了）',
+  ],
+};
+
+/* ── 台灣縣市特色選項 ───────────────── */
+const COUNTY_BONUS = {
+  eat: {
+    '台北市':  ['🥟 鼎泰豐小籠包','🥩 永康牛肉麵','🍺 師大夜市'],
+    '新北市':  ['🥚 深坑臭豆腐','🍜 三峽老街小吃','🦀 淡水魚丸'],
+    '基隆市':  ['🦞 基隆廟口夜市','🐟 基隆海鮮','🥟 天婦羅'],
+    '台中市':  ['🍢 台中肉圓','🥧 奶油酥餅','☕ 逢甲夜市'],
+    '台南市':  ['🫕 擔仔麵','🍜 台南牛肉湯','🥘 虱目魚粥','🍮 棺材板'],
+    '高雄市':  ['🦐 旗津海鮮','🐟 興達港海鮮','🍢 六合夜市'],
+    '宜蘭縣':  ['🐔 卜肉','🍡 牛舌餅','🫕 蔥油餅'],
+    '花蓮縣':  ['🥣 扁食','🍮 麻糬','🌽 公正包子'],
+    '屏東縣':  ['🍓 萬丹紅豆湯','🐟 東港鮪魚','🥭 愛文芒果'],
+    '苗栗縣':  ['🍢 客家板條','🥮 油蔥粿','🌰 薑汁撞奶'],
+    '嘉義市':  ['🍗 嘉義雞肉飯','🥘 火雞肉飯','🍡 方塊酥'],
+    '彰化縣':  ['🍢 彰化肉圓','🐮 卦山排骨','🍖 爌肉飯'],
+    '雲林縣':  ['🐮 斗六牛肉麵','🥜 北港花生','🥚 古坑咖啡雞蛋布丁'],
+    '桃園市':  ['🍱 桃園便當','🥣 大溪豆乾','🍡 蘆竹米干'],
+    '新竹市':  ['🥣 新竹米粉','🐷 貢丸湯','🍡 關西仙草'],
+    '台東縣':  ['🐟 旗魚黑輪','🌾 池上便當','🥗 原住民風味料理'],
+    '澎湖縣':  ['🦑 花枝丸','🦞 澎湖海鮮','🥛 仙人掌冰'],
+  },
+  drink: {
+    '台南市':  ['🧃 甘蔗汁（台南限定）','🍵 台南超甜奶茶'],
+    '台中市':  ['🧋 逢甲特調手搖','☕ 一中商圈咖啡'],
+    '高雄市':  ['🥛 岡山羊乳','🧃 美濃橙汁'],
+    '台北市':  ['☕ 大安森林公園咖啡','🧋 師大夜市手搖'],
+    '新竹市':  ['☕ 新竹科學城咖啡廳','🧋 竹北手搖特調'],
+    '宜蘭縣':  ['🧃 蘇澳碳酸冷泉礦泉水','🫖 礁溪溫泉茶'],
+  },
+  play: {
+    '台北市':  ['🏙️ 信義商圈逛街','🎭 故宮博物院','🚡 貓空纜車'],
+    '新北市':  ['🌊 野柳地質公園','🏔️ 九份老街','🌸 烏來溫泉'],
+    '台中市':  ['🌈 彩虹眷村','🏛️ 科學博物館','🌿 東海藝術街區'],
+    '台南市':  ['🏛️ 安平古堡','🌅 台南老街散步','🎭 鹽水蜂炮文化'],
+    '高雄市':  ['🌉 愛河夜景散步','🎪 駁二藝術特區','🌊 旗津騎腳踏車'],
+    '宜蘭縣':  ['🎡 冬山河親水公園','🌲 太平山國家森林'],
+    '花蓮縣':  ['🏔️ 太魯閣峽谷健行','🌊 七星潭看日出'],
+    '台東縣':  ['🌋 綠島浮潛','🚴 台東環島騎車','🌾 池上伯朗大道'],
+    '屏東縣':  ['🐠 墾丁浮潛','🌴 墾丁大街','🦋 蝴蝶谷賞蝶'],
+    '澎湖縣':  ['🤿 澎湖浮潛','🏖️ 奎壁山趕潮','⛵ 搭船遊嶼'],
+    '苗栗縣':  ['🎋 三義木雕街','🚂 舊山線鐵道自行車'],
+  },
+};
+
+const SEARCH_MAP = {
+  '麥當勞':'麥當勞','珍珠奶茶':'手搖飲料店','牛肉麵':'牛肉麵',
+  '排骨便當':'便當店','壽司':'壽司','Pizza':'披薩',
+  '燒肉':'燒肉','雞排':'雞排','Taco Bell':'墨西哥餐廳',
+  '蛋糕':'蛋糕甜點','霜淇淋':'甜點','咖哩飯':'咖哩',
+  '蛋餅':'早餐店','鹹酥雞':'鹹酥雞',
+  '波霸奶茶':'珍珠奶茶','咖啡廳':'咖啡廳','可樂':'便利商店',
+  '抹茶拿鐵':'咖啡廳','柳橙汁':'飲料','Beer':'酒吧',
+  '調酒BAR':'酒吧','手搖紅茶':'手搖飲料店','鮮奶':'超市',
+  '果汁':'飲料','礦泉水（哭哭）':'便利商店','檸檬愛玉':'愛玉冰',
+  '打電動':'電玩遊樂場','Netflix':'（開電視就好了）','KTV':'KTV',
+  '保齡球':'保齡球館','逛街購物':'百貨公司','桌遊咖啡':'桌遊店',
+  '騎腳踏車':'腳踏車租借','爬山健行':'登山步道','看電影':'電影院',
+  '打球':'球場','射飛鏢':'撞球飛鏢','畫畫':'文創手作',
+  '睡覺啦':'膠囊旅館（認真？）','滑手機（又回來了）':'網咖',
+};
+
+function toMapQuery(result) {
+  const text = result.replace(/^[^\w一-龥]+/, '').trim();
+  const key  = Object.keys(SEARCH_MAP).find(k => text.includes(k));
+  return key ? SEARCH_MAP[key] : text;
+}
+
+/* ═══════════════════════════════════════
+   OVERPASS API
+═══════════════════════════════════════ */
+const OVERPASS_FILTER = {
+  '麥當勞':      '["name"~"麥當勞|McDonald",i]',
+  '手搖飲料店':  '["amenity"="bubble_tea"]',
+  '牛肉麵':      '["name"~"牛肉麵",i]',
+  '便當店':      '["name"~"便當",i]',
+  '壽司':        '["name"~"壽司|sushi",i]',
+  '披薩':        '["name"~"披薩|pizza",i]',
+  '燒肉':        '["name"~"燒肉|燒烤",i]',
+  '雞排':        '["name"~"雞排",i]',
+  '墨西哥餐廳':  '["amenity"~"restaurant|fast_food"]',
+  '蛋糕甜點':    '["amenity"~"bakery|dessert"]',
+  '甜點':        '["amenity"~"ice_cream|dessert|bakery"]',
+  '咖哩':        '["name"~"咖哩|curry",i]',
+  '早餐店':      '["name"~"早餐",i]',
+  '鹹酥雞':      '["name"~"鹹酥雞",i]',
+  '珍珠奶茶':    '["amenity"="bubble_tea"]',
+  '咖啡廳':      '["amenity"="cafe"]',
+  '便利商店':    '["shop"="convenience"]',
+  '酒吧':        '["amenity"~"bar|pub"]',
+  '超市':        '["shop"~"supermarket|grocery"]',
+  '飲料':        '["shop"~"beverages|drinks"]',
+  '愛玉冰':      '["amenity"~"ice_cream|dessert"]',
+  '電玩遊樂場':  '["leisure"~"amusement_arcade|video_arcade"]',
+  'KTV':         '["amenity"="karaoke_box"]',
+  '保齡球館':    '["leisure"="bowling_alley"]',
+  '百貨公司':    '["shop"="department_store"]',
+  '桌遊店':      '["shop"~"games|toys"]',
+  '腳踏車租借':  '["shop"="bicycle"]',
+  '電影院':      '["amenity"="cinema"]',
+  '球場':        '["leisure"~"pitch|sports_centre"]',
+  '撞球飛鏢':    '["amenity"~"billiards|nightclub"]',
+  '文創手作':    '["shop"~"art|craft|stationery"]',
+  '網咖':        '["amenity"="internet_cafe"]',
+};
+
+const TYPE_META = {
+  restaurant:       { icon:'🍽️', label:'餐廳' },
+  fast_food:        { icon:'🥡', label:'速食/小吃' },
+  cafe:             { icon:'☕', label:'咖啡廳' },
+  bubble_tea:       { icon:'🧋', label:'手搖飲' },
+  bar:              { icon:'🍺', label:'酒吧' },
+  pub:              { icon:'🍺', label:'酒吧' },
+  supermarket:      { icon:'🛒', label:'超市' },
+  grocery:          { icon:'🛒', label:'超市' },
+  convenience:      { icon:'🏪', label:'便利商店' },
+  cinema:           { icon:'🎬', label:'電影院' },
+  karaoke_box:      { icon:'🎤', label:'KTV' },
+  bowling_alley:    { icon:'🎳', label:'保齡球' },
+  amusement_arcade: { icon:'🕹️', label:'電玩' },
+  video_arcade:     { icon:'🕹️', label:'電玩' },
+  bicycle:          { icon:'🚴', label:'腳踏車' },
+  department_store: { icon:'🏬', label:'百貨' },
+  sports_centre:    { icon:'⚽', label:'運動中心' },
+  pitch:            { icon:'⚽', label:'球場' },
+  internet_cafe:    { icon:'💻', label:'網咖' },
+  ice_cream:        { icon:'🍦', label:'冰品甜點' },
+  dessert:          { icon:'🍮', label:'甜點' },
+  bakery:           { icon:'🥐', label:'烘焙' },
+  beverages:        { icon:'🥤', label:'飲料店' },
+  drinks:           { icon:'🥤', label:'飲料店' },
+  games:            { icon:'🎲', label:'桌遊' },
+  art:              { icon:'🎨', label:'文創' },
+  craft:            { icon:'🎨', label:'手作' },
+  billiards:        { icon:'🎱', label:'撞球' },
+  nightclub:        { icon:'🎯', label:'飛鏢/夜生活' },
+};
+
+function getPlaceMeta(tags) {
+  const type = tags.amenity || tags.shop || tags.leisure || '';
+  return TYPE_META[type] || { icon:'📍', label: type || '' };
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000, r = d => d * Math.PI / 180;
+  const dLat = r(lat2-lat1), dLng = r(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function fmtDist(m) {
+  return m < 1000 ? `${Math.round(m)} m` : `${(m/1000).toFixed(1)} km`;
+}
+
+async function queryOverpass(lat, lng, searchKey) {
+  const filter = OVERPASS_FILTER[searchKey];
+  if (!filter) return null;
+  const q = `[out:json][timeout:10];
+(node${filter}(around:1500,${lat},${lng});
+ way${filter}(around:1500,${lat},${lng}););
+out center 12;`;
+  const res = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(q),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data.elements
+    .filter(el => el.tags && el.tags.name)
+    .map(el => {
+      const elLat = el.lat ?? el.center?.lat;
+      const elLng = el.lon ?? el.center?.lon;
+      return { name: el.tags.name, dist: haversine(lat, lng, elLat, elLng), tags: el.tags, lat: elLat, lng: elLng };
+    })
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 8);
+}
+
+/* ═══════════════════════════════════════
+   STATE
+═══════════════════════════════════════ */
+let activeCat   = 'eat';
+let busy        = false;
+let userLat     = null;
+let userLng     = null;
+let userCounty  = null;
+let hamCurrent  = 'idle';
+const picks     = [];
+
+/* ═══════════════════════════════════════
+   DOM REFS
+═══════════════════════════════════════ */
+const ring       = document.getElementById('ring');
+const hamFb      = document.getElementById('ham-fb');
+const statusEl   = document.getElementById('status');
+const rbox       = document.getElementById('rbox');
+const hint       = document.getElementById('hint');
+const pickEl     = document.getElementById('pick');
+const spinBtn    = document.getElementById('spin-btn');
+const nearbyBtn  = document.getElementById('nearby-btn');
+const nearbyList = document.getElementById('nearby-list');
+const histEl     = document.getElementById('hist');
+const histTagsEl = document.getElementById('hist-tags');
+const locBar     = document.getElementById('loc-bar');
+const locBtn     = document.getElementById('loc-btn');
+const locText    = document.getElementById('loc-text');
+const countyChip = document.getElementById('county-chip');
+const httpsWarn  = document.getElementById('https-warn');
+
+/* ═══════════════════════════════════════
+   GIF POOL — 90+ IDs
+═══════════════════════════════════════ */
+const HAM_FB = { idle: '🐹' };
+
+const HAM_POOL = [
+  // meme
+  '9362610808603976595','11717241442082625890','8074579597032415784',
+  '7203935162228078411','1938565721637505019','5161457700748615273',
+  '2352501931036504027','8409566934641275028','15204413824189168296',
+  '12511504418098988988','13443794283095204299','11474620212042181730',
+  '10371209337855187787','18120156955402952750','7664926947584230577',
+  '16220622256217289040','2961890748162694776',
+  // spinning
+  '24417537','7589613','9565765435847642958','22704612','22374976',
+  '10746499','5185538320055769266','22374967','17925359','17876633',
+  '12962771519568010584','23596102',
+  // funny
+  '16447266013738213117','12782518306215428977','17349305936205128520',
+  '2284537794411905289','11029406084894317254',
+  // eating
+  '3147999970256405142','17787720303973820870','27168635','24826189',
+  '5814949428366169953','12857427','10050841401707578768',
+  '2699101254265325089','18192709','10181071745272541691',
+  '650371804208337476','16534129490837181988',
+  // dancing
+  '16890474','9033805473501488029','6216066280646984022',
+  '2983481232452111668','11916243842602194726','5259422824207376058',
+  '25645663','12152094704691197978','11100623236604404872',
+  '3163642072997987107','9083342186356416645','8130498177401790090',
+  '24153027',
+  // cute
+  '7698851379247993735','14225510256818294299','27406501',
+  '9366856306231297979','10854706892825184307','27406503',
+  '9329922426305939438','720334212124145926','1441841320260874927',
+  '3247728299048174828','24928538','27530661','16733188953041297220',
+  // shocked
+  '2755803534342744925','8020162073998133143','7811010537256565019',
+  '2346663150137884160','4955399104466158937','22928875',
+  '12054898514924048020','7335265129936931555','8547291235279979252',
+  '13368273','13908929','23079799',
+  // running
+  '6847627278834990721','26596140','9764281321434215044',
+  '9923122822750356014','26147083','25564498','26474394',
+  '6563316932530407873','22364325',
+];
+
+const itemGifMap = {};
+function getGifForItem(item) {
+  if (!itemGifMap[item]) itemGifMap[item] = nextGifId();
+  return itemGifMap[item];
+}
+
+let _poolQueue = [];
+function nextGifId() {
+  if (_poolQueue.length === 0) _poolQueue = [...HAM_POOL].sort(() => Math.random() - .5);
+  return _poolQueue.pop();
+}
+
+function loadHamState(el) {
+  if (!el || el.dataset.tenorLoaded || !el.dataset.postid) return;
+  const iframe = document.createElement('iframe');
+  iframe.src = `https://tenor.com/embed/${el.dataset.postid}`;
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;pointer-events:none;';
+  iframe.setAttribute('allow', 'autoplay');
+  el.appendChild(iframe);
+  el.dataset.tenorLoaded = '1';
+}
+
+// Staggered preload: avoid 413 burst
+const CY_SLOTS = Array.from(document.querySelectorAll('.ham-cycle'));
+CY_SLOTS.forEach((el, i) => setTimeout(() => loadHamState(el), 1500 + i * 700));
+
+function setResultGif(postid, burst = false) {
+  const resultEl = document.getElementById('s-result');
+  resultEl.innerHTML = '';
+  const iframe = document.createElement('iframe');
+  iframe.src = `https://tenor.com/embed/${postid}`;
+  iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;pointer-events:none;';
+  iframe.setAttribute('allow', 'autoplay');
+  resultEl.appendChild(iframe);
+  setHam('result', burst);
+}
+
+function setHam(state, burst = false) {
+  const prev = document.getElementById('s-' + hamCurrent);
+  const next = document.getElementById('s-' + state);
+  if (prev) prev.classList.remove('active', 'burst-in');
+  if (next) {
+    next.classList.remove('burst-in');
+    if (burst) void next.offsetWidth;
+    next.classList.add('active');
+    if (burst) next.classList.add('burst-in');
+  }
+  hamFb.textContent = HAM_FB[state] || '🐹';
+  hamCurrent = state;
+}
+
+function setStat(t, lit = false) {
+  statusEl.textContent = t;
+  statusEl.className = 'status' + (lit ? ' lit' : '');
+}
+
+/* ═══════════════════════════════════════
+   COUNTY — inject local items
+═══════════════════════════════════════ */
+function injectCountyItems(county) {
+  Object.keys(ITEMS).forEach(cat => {
+    const bonus = COUNTY_BONUS[cat]?.[county];
+    if (!bonus) return;
+    bonus.forEach(item => {
+      if (!ITEMS[cat].includes(item)) ITEMS[cat].unshift(item);
+    });
+  });
+}
+
+/* ═══════════════════════════════════════
+   GEOLOCATION + NOMINATIM REVERSE GEOCODE
+═══════════════════════════════════════ */
+locBtn.addEventListener('click', () => {
+  if (location.protocol === 'file:') {
+    httpsWarn.style.display = 'block';
+    locText.textContent = '⚠️ file:// 不支援定位，見上方說明';
+    return;
+  }
+  if (!navigator.geolocation) {
+    locText.textContent = '你的瀏覽器不支援定位 😢';
+    return;
+  }
+  locBtn.textContent = '⏳ 定位中...';
+  locBtn.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    async pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      locBar.classList.add('located');
+      locText.textContent = '已定位！正在辨識縣市…';
+      locBtn.textContent = '✅ 已定位';
+
+      // Nominatim reverse geocode → county name
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}&zoom=10&accept-language=zh-TW`,
+          { headers: { 'Accept-Language': 'zh-TW' } }
+        );
+        const d = await r.json();
+        const addr = d.address || {};
+        // Taiwan: municipality → city, county/district → county
+        const county = addr.city || addr.county || addr.state || '';
+        if (county && county !== '台灣') {
+          userCounty = county;
+          countyChip.textContent = '📍 ' + county;
+          countyChip.style.display = 'inline';
+          locText.textContent = '已定位 · 推薦當地選項';
+          injectCountyItems(county);
+        } else {
+          locText.textContent = '已定位！抽到後找附近店家';
+        }
+      } catch (_) {
+        locText.textContent = '已定位！抽到後找附近店家';
+      }
+    },
+    err => {
+      locBtn.textContent = '❌ 定位失敗';
+      locBtn.disabled = false;
+      const msgs = { 1:'請允許位置權限', 2:'無法取得位置', 3:'定位逾時' };
+      if (err.code === 1 && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        httpsWarn.style.display = 'block';
+        locText.textContent = '⚠️ iOS 需要 HTTPS 才能定位';
+      } else {
+        locText.textContent = msgs[err.code] || '定位失敗，可手動搜尋';
+        setTimeout(() => { locBtn.textContent = '📍 重試'; locBtn.disabled = false; }, 3000);
+      }
+    },
+    { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false }
+  );
+});
+
+/* ═══════════════════════════════════════
+   NEARBY
+═══════════════════════════════════════ */
+async function showNearby(result) {
+  const q = toMapQuery(result);
+
+  if (q.includes('（') && q.includes('）')) {
+    nearbyBtn.innerHTML = `😂 "${q}"…就自己想辦法吧<small>（倉鼠也不知道去哪找）</small>`;
+    nearbyBtn.onclick = null;
+    nearbyBtn.classList.add('show');
+    nearbyList.classList.remove('show');
+    return;
+  }
+
+  const mapsUrl = userLat && userLng
+    ? `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${userLat},${userLng},15z`
+    : `https://maps.google.com/?q=${encodeURIComponent(q)}`;
+
+  nearbyBtn.innerHTML = `🗺️ 找附近的 <strong>${q}</strong><small>${userLat ? '以目前位置搜尋' : '點擊開啟 Google Maps'}</small>`;
+  nearbyBtn.onclick = () => window.open(mapsUrl, '_blank');
+  nearbyBtn.classList.add('show');
+
+  if (!userLat || !userLng) return;
+
+  nearbyList.classList.add('show');
+  nearbyList.innerHTML = `
+    <div class="nl-header">附近店家 / NEARBY</div>
+    <div class="nl-loading"><div class="nl-spinner"></div>倉鼠正在地圖上找店家…</div>`;
+
+  try {
+    const results = await queryOverpass(userLat, userLng, q);
+
+    if (!results || results.length === 0) {
+      nearbyList.innerHTML = `
+        <div class="nl-header">附近店家 / NEARBY</div>
+        <div class="nl-empty">附近 1.5km 內找不到相關店家 😔<br>地圖資料可能尚未收錄
+          <a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 改用 Google Maps 搜尋</a>
+        </div>`;
+      return;
+    }
+
+    const cards = results.map(p => {
+      const meta = getPlaceMeta(p.tags);
+      const link = `https://maps.google.com/?q=${p.lat},${p.lng}`;
+      return `<a class="nearby-card" href="${link}" target="_blank" rel="noopener">
+        <div class="nl-icon">${meta.icon}</div>
+        <div class="nl-info">
+          <div class="nl-name">${p.name}</div>
+          <div class="nl-meta">
+            <span class="nl-dist">${fmtDist(p.dist)}</span>
+            ${meta.label ? `<span class="nl-type">${meta.label}</span>` : ''}
+          </div>
+        </div>
+        <span class="nl-arrow">›</span>
+      </a>`;
+    }).join('');
+
+    nearbyList.innerHTML = `
+      <div class="nl-header">附近 ${results.length} 間 / NEARBY</div>
+      ${cards}
+      <a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 在 Google Maps 看更多</a>`;
+
+  } catch (e) {
+    nearbyList.innerHTML = `
+      <div class="nl-header">附近店家 / NEARBY</div>
+      <div class="nl-empty">搜尋失敗（網路問題或 API 逾時）
+        <a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 改用 Google Maps 搜尋</a>
+      </div>`;
+  }
+}
+
+/* ═══════════════════════════════════════
+   CATEGORY BUTTONS
+═══════════════════════════════════════ */
+document.querySelectorAll('.cat').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (busy) return;
+    document.querySelectorAll('.cat').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    activeCat = btn.dataset.cat;
+    const lines = { eat:'🍔 EAT mode activated!', drink:'🧋 DRINK mode — thirsty?', play:'🎮 PLAY mode — no life!!' };
+    setStat(lines[activeCat], true);
+    setTimeout(() => setStat('ready to spin!'), 2000);
+  });
+});
+
+/* ═══════════════════════════════════════
+   TITLE WIGGLE
+═══════════════════════════════════════ */
+document.getElementById('title-el').addEventListener('click', function() {
+  this.style.animation = 'none';
+  void this.offsetWidth;
+  this.style.animation = '';
+});
+
+/* ═══════════════════════════════════════
+   SPIN
+═══════════════════════════════════════ */
+spinBtn.addEventListener('click', function(e) {
+  if (busy) return;
+  busy = true;
+
+  // Ripple
+  const rip = document.createElement('span');
+  const rc  = spinBtn.getBoundingClientRect();
+  const sz  = Math.max(rc.width, rc.height);
+  rip.className = 'rip';
+  rip.style.cssText = `width:${sz}px;height:${sz}px;left:${e.clientX-rc.left-sz/2}px;top:${e.clientY-rc.top-sz/2}px`;
+  spinBtn.appendChild(rip);
+  setTimeout(() => rip.remove(), 700);
+
+  spinBtn.classList.add('busy');
+  spinBtn.textContent = '🔮 Hamster is thinking...';
+  nearbyBtn.classList.remove('show');
+  nearbyList.classList.remove('show');
+  ring.className = 'ring fast';
+  setStat('calculating destiny...', true);
+
+  const frameEl = document.querySelector('.frame');
+  const hamWrap = document.querySelector('.ham-wrap');
+  frameEl.classList.remove('excited');
+  frameEl.classList.add('spinning');
+  hamWrap.classList.add('cycling');
+
+  // Switch to first cycling slot
+  const _curEl = document.getElementById('s-' + hamCurrent);
+  if (_curEl) _curEl.classList.remove('active', 'burst-in');
+  hamCurrent = 'cycling';
+  let cyIdx = 0;
+  CY_SLOTS.forEach(s => s.classList.remove('active', 'cy-pop'));
+  let prevSlot = CY_SLOTS[0];
+  if (prevSlot) prevSlot.classList.add('active');
+
+  hint.style.display = 'none';
+  pickEl.style.display = 'block';
+  pickEl.className = `pick rolling ${activeCat}`;
+  rbox.className = 'rbox';
+
+  const items  = ITEMS[activeCat];
+  // [ms間隔, 次數] — 瘋狂 → 凝結 → 懸念
+  const STAGES = [[38,22],[70,14],[130,9],[240,5],[480,3],[850,1]];
+  let si = 0;
+
+  function nextStage() {
+    if (si >= STAGES.length) { finish(); return; }
+    const [ms, n] = STAGES[si++];
+    let c = 0;
+    const t = setInterval(() => {
+
+      /* ── 優化：所有 class 移除 → 1 次 reflow → 全部新增 ── */
+      pickEl.classList.remove('rolling');
+      hamWrap.classList.remove('ticking');
+      if (prevSlot) prevSlot.classList.remove('active', 'cy-pop');
+
+      void pickEl.offsetWidth; // single reflow (needed for rolling + ticking restart)
+
+      pickEl.textContent = items[Math.floor(Math.random() * items.length)];
+      pickEl.classList.add('rolling');
+      hamWrap.classList.add('ticking');
+
+      // next slot: cy-pop wasn't on it, so adding starts fresh (no reflow needed)
+      cyIdx = (cyIdx + 1) % CY_SLOTS.length;
+      prevSlot = CY_SLOTS[cyIdx];
+      prevSlot.classList.add('active', 'cy-pop');
+
+      if (++c >= n) { clearInterval(t); nextStage(); }
+    }, ms);
+  }
+
+  function finish() {
+    CY_SLOTS.forEach(s => s.classList.remove('active', 'cy-pop'));
+    hamWrap.classList.remove('cycling', 'ticking');
+    hamCurrent = 'idle';
+
+    const final = items[Math.floor(Math.random() * items.length)];
+    pickEl.className = `pick pop ${activeCat}`;
+    pickEl.textContent = final;
+
+    // Show local badge if county bonus item
+    const isLocal = userCounty && COUNTY_BONUS[activeCat]?.[userCounty]?.includes(final);
+    if (isLocal) {
+      setTimeout(() => {
+        const badge = document.createElement('div');
+        badge.className = 'local-badge';
+        badge.textContent = `📍 ${userCounty} 特色`;
+        pickEl.insertAdjacentElement('afterend', badge);
+        setTimeout(() => badge.remove(), 8000);
+      }, 700);
+    }
+
+    frameEl.classList.remove('spinning');
+    frameEl.classList.add('excited');
+    setTimeout(() => frameEl.classList.remove('excited'), 2300);
+
+    setTimeout(() => setResultGif(getGifForItem(final), true), 60);
+
+    ring.className = `ring glow-${activeCat}`;
+    rbox.className = `rbox g-${activeCat}`;
+    setTimeout(() => { ring.className = 'ring'; }, 3200);
+
+    const statLines = { eat:'nom nom nom 🍔', drink:'gulp gulp 🧋', play:"LET'S GOOO 🎮" };
+    setStat(statLines[activeCat], true);
+    setTimeout(() => setStat('spin again!'), 3000);
+
+    launchConfetti();
+    spawnParticles(activeCat);
+
+    setTimeout(() => showNearby(final), 450);
+    pushHistory(final, activeCat);
+
+    spinBtn.textContent = '🎰 Spin Again!';
+    spinBtn.classList.remove('busy');
+    busy = false;
+  }
+
+  nextStage();
+});
+
+/* ═══════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════ */
+function pushHistory(item, cat) {
+  picks.unshift({ item, cat });
+  if (picks.length > 8) picks.pop();
+  histEl.style.display = 'block';
+  histTagsEl.innerHTML = picks.map((p, i) =>
+    `<span class="h-tag ${p.cat}" style="animation-delay:${i*.04}s">${p.item}</span>`
+  ).join('');
+}
+
+/* ═══════════════════════════════════════
+   CONFETTI
+═══════════════════════════════════════ */
+function launchConfetti() {
+  const cv  = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  cv.width  = innerWidth;
+  cv.height = innerHeight;
+  const PAL = {
+    eat:   ['#ff6b6b','#ff9a9a','#ffd700','#ffb347'],
+    drink: ['#4ecdc4','#9ef5f1','#ffd700','#b2f5ea'],
+    play:  ['#a78bfa','#c4b5fd','#ffd700','#f0abfc'],
+  };
+  const cols = PAL[activeCat] || ['#ff6b35','#ffd700'];
+  const ps = Array.from({length:88}, () => ({
+    x:Math.random()*cv.width, y:-10-Math.random()*35,
+    w:4+Math.random()*9, h:2+Math.random()*5,
+    col:cols[Math.floor(Math.random()*cols.length)],
+    vy:2.5+Math.random()*5, vx:(Math.random()-.5)*3.5,
+    rot:Math.random()*360, drot:(Math.random()-.5)*11,
+    wv:Math.random()*Math.PI*2,
+  }));
+  let f = 0; const MAX = 125;
+  (function draw() {
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for (const p of ps) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1-f/MAX);
+      ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle = p.col;
+      ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      ctx.restore();
+      p.y+=p.vy; p.x+=p.vx+Math.sin(f*.12+p.wv)*.9; p.rot+=p.drot;
+    }
+    if (++f<MAX) requestAnimationFrame(draw);
+    else ctx.clearRect(0,0,cv.width,cv.height);
+  })();
+}
+
+/* ═══════════════════════════════════════
+   FLOATING PARTICLES
+═══════════════════════════════════════ */
+function spawnParticles(cat) {
+  const pool = {
+    eat:   ['🍔','🍗','🍜','🧋','🐹','✨','⭐'],
+    drink: ['🧋','☕','🥤','🍹','🐹','💫','✨'],
+    play:  ['🎮','🎯','🎲','🏆','🐹','⭐','🔥'],
+  }[cat] || ['🐹','✨'];
+  for (let i=0; i<10; i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'fp';
+      el.textContent = pool[Math.floor(Math.random()*pool.length)];
+      el.style.left  = (6+Math.random()*88)+'vw';
+      el.style.top   = (25+Math.random()*50)+'vh';
+      el.style.animationDelay = Math.random()*.25+'s';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2200);
+    }, i*65);
+  }
+}
+</script>
+</body>
+</html>
