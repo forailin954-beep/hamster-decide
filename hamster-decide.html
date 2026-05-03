@@ -1369,29 +1369,52 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 function fmtDist(m) { return m < 1000 ? `${Math.round(m)} m` : `${(m/1000).toFixed(1)} km`; }
 
+/* 多個備援 Overpass 端點，依序嘗試 */
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter',
+];
+
 async function queryOverpass(lat, lng, searchKey) {
   const filter = OVERPASS_FILTER[searchKey];
   if (!filter) return null;
-  const q = `[out:json][timeout:10];
+
+  const q = `[out:json][timeout:12];
 (node${filter}(around:1500,${lat},${lng});
  way${filter}(around:1500,${lat},${lng}););
-out center 12;`;
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(q),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  return data.elements
-    .filter(el => el.tags && el.tags.name)
-    .map(el => {
-      const elLat = el.lat ?? el.center?.lat;
-      const elLng = el.lon ?? el.center?.lon;
-      return { name: el.tags.name, dist: haversine(lat, lng, elLat, elLng), tags: el.tags, lat: elLat, lng: elLng };
-    })
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 8);
+out center 10;`;
+  const body = 'data=' + encodeURIComponent(q);
+
+  let lastErr;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 14000); // 14 s per endpoint
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(tid);
+      if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
+      const data = await res.json();
+      return data.elements
+        .filter(el => el.tags && el.tags.name)
+        .map(el => {
+          const elLat = el.lat ?? el.center?.lat;
+          const elLng = el.lon ?? el.center?.lon;
+          return { name: el.tags.name, dist: haversine(lat, lng, elLat, elLng), tags: el.tags, lat: elLat, lng: elLng };
+        })
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 8);
+    } catch (e) {
+      lastErr = e;
+      // try next endpoint
+    }
+  }
+  throw lastErr || new Error('All endpoints failed');
 }
 
 /* ═══════════════════════════════════════
@@ -1654,6 +1677,8 @@ locBtn.addEventListener('click', () => {
 ═══════════════════════════════════════ */
 async function showNearby(result) {
   const q = toMapQuery(result);
+
+  // 搞笑選項（學習/療癒等無實體地點）→ 直接顯示 Maps 按鈕不查 API
   if (q.includes('（') && q.includes('）')) {
     nearbyBtn.innerHTML = `😂 "${q}"…就自己想辦法吧<small>（倉鼠也不知道去哪找）</small>`;
     nearbyBtn.onclick = null;
@@ -1661,29 +1686,57 @@ async function showNearby(result) {
     nearbyList.classList.remove('show');
     return;
   }
+
   const mapsUrl = userLat && userLng
     ? `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${userLat},${userLng},15z`
     : `https://maps.google.com/?q=${encodeURIComponent(q)}`;
+
   nearbyBtn.innerHTML = `🗺️ 找附近的 <strong>${q}</strong><small>${userLat ? '以目前位置搜尋' : '點擊開啟 Google Maps'}</small>`;
   nearbyBtn.onclick = () => window.open(mapsUrl, '_blank');
   nearbyBtn.classList.add('show');
-  if (!userLat || !userLng) return;
+
+  // 沒有定位 or 沒有對應的 Overpass filter → 只顯示 Maps 按鈕，不顯示 loading
+  if (!userLat || !userLng || !OVERPASS_FILTER[q]) {
+    nearbyList.classList.remove('show');
+    return;
+  }
+
   nearbyList.classList.add('show');
   nearbyList.innerHTML = `<div class="nl-header">附近店家 / NEARBY</div><div class="nl-loading"><div class="nl-spinner"></div>倉鼠正在地圖上找店家…</div>`;
+
   try {
     const results = await queryOverpass(userLat, userLng, q);
     if (!results || results.length === 0) {
-      nearbyList.innerHTML = `<div class="nl-header">附近店家 / NEARBY</div><div class="nl-empty">附近 1.5km 內找不到相關店家 😔<br>地圖資料可能尚未收錄<a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 改用 Google Maps 搜尋</a></div>`;
+      nearbyList.innerHTML = `<div class="nl-header">附近店家 / NEARBY</div>
+        <div class="nl-empty">附近 1.5km 內找不到相關店家 😔<br>地圖資料可能尚未收錄
+          <a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 改用 Google Maps 搜尋</a>
+        </div>`;
       return;
     }
     const cards = results.map(p => {
       const meta = getPlaceMeta(p.tags);
       const link = `https://maps.google.com/?q=${p.lat},${p.lng}`;
-      return `<a class="nearby-card" href="${link}" target="_blank" rel="noopener"><div class="nl-icon">${meta.icon}</div><div class="nl-info"><div class="nl-name">${p.name}</div><div class="nl-meta"><span class="nl-dist">${fmtDist(p.dist)}</span>${meta.label ? `<span class="nl-type">${meta.label}</span>` : ''}</div></div><span class="nl-arrow">›</span></a>`;
+      return `<a class="nearby-card" href="${link}" target="_blank" rel="noopener">
+        <div class="nl-icon">${meta.icon}</div>
+        <div class="nl-info">
+          <div class="nl-name">${p.name}</div>
+          <div class="nl-meta">
+            <span class="nl-dist">${fmtDist(p.dist)}</span>
+            ${meta.label ? `<span class="nl-type">${meta.label}</span>` : ''}
+          </div>
+        </div>
+        <span class="nl-arrow">›</span>
+      </a>`;
     }).join('');
-    nearbyList.innerHTML = `<div class="nl-header">附近 ${results.length} 間 / NEARBY</div>${cards}<a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 在 Google Maps 看更多</a>`;
+    nearbyList.innerHTML = `<div class="nl-header">附近 ${results.length} 間 / NEARBY</div>
+      ${cards}
+      <a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 在 Google Maps 看更多</a>`;
   } catch (e) {
-    nearbyList.innerHTML = `<div class="nl-header">附近店家 / NEARBY</div><div class="nl-empty">搜尋失敗<a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ 改用 Google Maps 搜尋</a></div>`;
+    // 三個端點都失敗：改顯示 Maps 按鈕，不顯示嚇人的「搜尋失敗」
+    nearbyList.innerHTML = `<div class="nl-header">附近店家 / NEARBY</div>
+      <div class="nl-empty">⚠️ 地圖服務暫時無法連線，請直接用 Maps 搜尋
+        <a class="nl-maps-btn" href="${mapsUrl}" target="_blank" rel="noopener">🗺️ Google Maps 搜尋附近的 ${q}</a>
+      </div>`;
   }
 }
 
