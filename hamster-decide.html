@@ -906,6 +906,58 @@
       animation: cat-on-glow 2.5s ease-in-out infinite !important;
     }
 
+    /* ── WATERMARK ──────────────────────── */
+    .watermark {
+      position: fixed;
+      bottom: 1.1rem;
+      right: 1.1rem;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      background: rgba(253,250,246,.82);
+      border: 1px solid var(--brd);
+      border-radius: 100px;
+      padding: .32rem .75rem .32rem .5rem;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: var(--shadow-sm);
+      text-decoration: none;
+      color: var(--muted);
+      font-size: .68rem;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-weight: 700;
+      letter-spacing: .03em;
+      user-select: none;
+      transition: all .25s cubic-bezier(.34,1.56,.64,1);
+      animation: wm-in .9s cubic-bezier(.34,1.56,.64,1) 3s both;
+    }
+    @keyframes wm-in {
+      from { opacity: 0; transform: translateY(12px) scale(.85); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @media (hover: hover) {
+      .watermark:hover {
+        background: rgba(255,255,255,.95);
+        border-color: rgba(224,123,66,.4);
+        color: var(--orange);
+        transform: translateY(-2px) scale(1.04);
+        box-shadow: 0 4px 18px rgba(224,123,66,.18), var(--shadow-sm);
+      }
+    }
+    .watermark:active { transform: scale(.96); }
+    .wm-avatar {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--orange), var(--gold));
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem;
+      flex-shrink: 0;
+    }
+    .wm-text { line-height: 1.3; }
+    .wm-name { display: block; color: var(--text); font-size: .68rem; }
+    .wm-ig   { display: block; color: var(--muted); font-size: .6rem; font-weight: 400; opacity: .8; }
+
     /* ── CAT MINI RIPPLE ────────────────── */
     .cat-rip {
       position: absolute; border-radius: 50%;
@@ -919,6 +971,15 @@
 
 <body>
 <canvas id="cv"></canvas>
+
+<!-- Watermark -->
+<a class="watermark" href="https://www.instagram.com/xian_ace_lin" target="_blank" rel="noopener">
+  <div class="wm-avatar">🐹</div>
+  <div class="wm-text">
+    <span class="wm-name">林品賢</span>
+    <span class="wm-ig">@xian_ace_lin</span>
+  </div>
+</a>
 
 <!-- Background spin effect layers -->
 <div class="bg-orb bg-orb-1"></div>
